@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZAi Dashboard</title>
+    <script src="https://www.gstatic.com/firebasejs/9.6.6/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.6/firebase-database-compat.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f2f5;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .dashboard {
+            background-color: #ffffff;
+            border: 1px solid #e2e0e0;
+            padding: 30px;
+            margin-top: 20px;
+        }
+
+        h1 {
+            color: #000000;
+            font-size: 32px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: 700;
+        }
+
+        .summary {
+            background-color: #e8f4fd;
+            padding: 5px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .summary-text {
+            font-size: 18px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .total-users {
+            font-size: 24px;
+            font-weight: 700;
+            color: #3498db;
+        }
+
+        .user-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0 10px;
+            margin-top: 20px;
+        }
+
+        .user-table th, .user-table td {
+            padding: 15px;
+            text-align: left;
+        }
+
+        .user-table th {
+            background-color: #000000;
+            color: #ffffff;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .user-table tr {
+            background-color: #ffffff;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            border: 1px solid #4d4747;
+            transition: all 0.3s ease;
+        }
+
+        .user-table tr:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .payment-status {
+            margin-left: 50px;
+            padding: 5px 10px;
+            /* border-radius: 4px; */
+            font-weight: bold;
+        }
+
+        .payment-status.paid {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        .payment-status.unpaid {
+            background-color: #F44336;
+            color: white;
+        }
+
+        .toggle-payment {
+            background-color :rgb(21,78,220);
+            color: white;
+            border: none;
+            padding: 8px 10px;
+            margin-left: -20px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .toggle-payment:hover {
+            background-color: #088de6;
+        }
+
+        @media (max-width: 768px) {
+            .user-table, .user-table tbody, .user-table tr, .user-table td {
+                display: block;
+            }
+
+            .user-table tr {
+                margin-bottom: 20px;
+                border-radius: 8px;
+            }
+
+            .user-table td {
+                position: relative;
+                padding-left: 50%;
+                text-align: right;
+            }
+
+            .user-table td:before {
+                content: attr(data-label);
+                position: absolute;
+                left: 15px;
+                width: 45%;
+                padding-right: 10px;
+                white-space: nowrap;
+                font-weight: 600;
+                text-align: left;
+            }
+
+            .user-table thead {
+                display: none;
+            }
+
+            .summary {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .total-users {
+                margin-top: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="dashboard">
+            <img src="images/z.png" width="50px" alt="ZAi Logo">
+            <h1>ZAi User Dashboard</h1>
+            <div class="summary">
+                <span class="summary-text">Total Users:</span>
+                <span id="totalUsers" class="total-users">0</span>
+                <div>
+                    <span class="summary-text">Total Revenue:</span>
+                    <span id="totalMoney" class="total-users">₹0</span>
+                </div>
+            </div>
+            <table class="user-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Occupation</th>
+                        <th>Payment Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="userTableBody">
+                    <!-- User data will be inserted here -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyCzo1-JRzMw7H2wd-ns6oYwIGgFcZHBOQA",
+            authDomain: "thenetworks-d338e.firebaseapp.com",
+            databaseURL: "https://thenetworks-d338e-default-rtdb.firebaseio.com",
+            projectId: "thenetworks-d338e",
+            storageBucket: "thenetworks-d338e.appspot.com",
+            messagingSenderId: "411720874279",
+            appId: "1:411720874279:web:0a6eaba6502e3e950d1102",
+            measurementId: "G-MZVRWSJ0SH"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        // Function to create a table row for a user
+        function createUserRow(user, userId) {
+            const row = document.createElement('tr');
+            const paymentStatus = user.paymentStatus ? 'Paid' : 'Unpaid';
+            const statusClass = user.paymentStatus ? 'paid' : 'unpaid';
+            row.innerHTML = `
+                <td data-label="Name">${user.name}</td>
+                <td data-label="Email">${user.email}</td>
+                <td data-label="Occupation">${user.occupation}</td>
+                <td data-label="Payment Status"><span class="payment-status ${statusClass}">${paymentStatus}</span></td>
+                <td data-label="Action"><button class="toggle-payment" data-userid="${userId}">Toggle Payment</button></td>
+            `;
+            return row;
+        }
+
+        // Function to update the table with user data
+        function updateUserTable(users) {
+            const tableBody = document.getElementById('userTableBody');
+            const totalUsersElement = document.getElementById('totalUsers');
+            tableBody.innerHTML = '';
+            Object.entries(users).forEach(([userId, user]) => {
+                tableBody.appendChild(createUserRow(user, userId));
+            });
+            totalUsersElement.textContent = Object.keys(users).length;
+            
+            document.getElementById("totalMoney").innerText = "₹" + totalUsersElement.innerText * 199;
+
+            // Add event listeners to toggle payment buttons
+            document.querySelectorAll('.toggle-payment').forEach(button => {
+                button.addEventListener('click', function() {
+                    const userId = this.getAttribute('data-userid');
+                    togglePaymentStatus(userId);
+                });
+            });
+        }
+
+        // Function to toggle payment status
+        function togglePaymentStatus(userId) {
+            const userRef = database.ref('zai_users/' + userId);
+            userRef.once('value').then((snapshot) => {
+                const userData = snapshot.val();
+                const newPaymentStatus = userData.paymentStatus ? 0 : 1;
+                userRef.update({ paymentStatus: newPaymentStatus });
+            });
+        }
+
+        // Fetch and display user data
+        const usersRef = database.ref('zai_users');
+        usersRef.on('value', (snapshot) => {
+            const data = snapshot.val();
+            const users = data ? data : {};
+            updateUserTable(users);
+        });
+    </script>
+</body>
+</html>

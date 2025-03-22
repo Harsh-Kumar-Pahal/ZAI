@@ -7,6 +7,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.6.6/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.6/firebase-database-compat.js"></script>
     <style>
+        /* Your existing CSS remains unchanged */
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
 
         * {
@@ -99,7 +100,6 @@
         .payment-status {
             margin-left: 50px;
             padding: 5px 10px;
-            /* border-radius: 4px; */
             font-weight: bold;
         }
 
@@ -114,7 +114,7 @@
         }
 
         .toggle-payment {
-            background-color :rgb(21,78,220);
+            background-color: rgb(21,78,220);
             color: white;
             border: none;
             padding: 8px 10px;
@@ -200,6 +200,45 @@
     </div>
 
     <script>
+        // Register service worker inline
+        const swCode = `
+            self.addEventListener('install', (event) => {
+                self.skipWaiting();
+            });
+
+            self.addEventListener('activate', (event) => {
+                event.waitUntil(self.clients.claim());
+            });
+
+            self.addEventListener('message', (event) => {
+                if (event.data && event.data.type === 'SHOW_NOTIFICATION') {
+                    self.registration.showNotification(event.data.title, {
+                        body: event.data.body,
+                        icon: 'images/z.png'
+                    });
+                }
+            });
+        `;
+
+        // Convert string to blob and register
+        const blob = new Blob([swCode], { type: 'application/javascript' });
+        const swUrl = URL.createObjectURL(blob);
+
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register(swUrl)
+                .then(registration => {
+                    console.log('Service Worker registered');
+                    // Request notification permission
+                    return Notification.requestPermission();
+                })
+                .then(permission => {
+                    if (permission === 'granted') {
+                        console.log('Notification permission granted');
+                    }
+                })
+                .catch(error => console.error('Service Worker Error:', error));
+        }
+
         // Initialize Firebase
         const firebaseConfig = {
             apiKey: "AIzaSyCzo1-JRzMw7H2wd-ns6oYwIGgFcZHBOQA",
@@ -230,6 +269,26 @@
             return row;
         }
 
+        // Function to show notification
+        function showNotification(title, body) {
+            if (Notification.permission === 'granted') {
+                if (document.hidden) { // Only show if tab is not active
+                    navigator.serviceWorker.ready.then(registration => {
+                        registration.active.postMessage({
+                            type: 'SHOW_NOTIFICATION',
+                            title: title,
+                            body: body
+                        });
+                    });
+                } else {
+                    new Notification(title, {
+                        body: body,
+                        icon: 'images/z.png'
+                    });
+                }
+            }
+        }
+
         // Function to update the table with user data
         function updateUserTable(users) {
             const tableBody = document.getElementById('userTableBody');
@@ -239,10 +298,8 @@
                 tableBody.appendChild(createUserRow(user, userId));
             });
             totalUsersElement.textContent = Object.keys(users).length;
-            
             document.getElementById("totalMoney").innerText = "₹" + totalUsersElement.innerText * 199;
 
-            // Add event listeners to toggle payment buttons
             document.querySelectorAll('.toggle-payment').forEach(button => {
                 button.addEventListener('click', function() {
                     const userId = this.getAttribute('data-userid');
@@ -261,18 +318,38 @@
             });
         }
 
-        // Fetch and display user data
+        // Fetch and display user data with notifications
         const usersRef = database.ref('zai_users');
+        let previousUserCount = parseInt(localStorage.getItem('userCount') || '0');
+        let initialLoad = true;
+
+        usersRef.on('child_added', (snapshot) => {
+            if (!initialLoad) {
+                const newUser = snapshot.val();
+                showNotification('New User Added!', 
+                    `Name: ${newUser.name}\nEmail: ${newUser.email}`);
+            }
+        });
+
         usersRef.on('value', (snapshot) => {
             const data = snapshot.val();
             const users = data ? data : {};
             updateUserTable(users);
+            
+            if (!initialLoad) {
+                const currentCount = Object.keys(users).length;
+                if (currentCount > previousUserCount) {
+                    previousUserCount = currentCount;
+                    localStorage.setItem('userCount', currentCount);
+                }
+            } else {
+                initialLoad = false;
+            }
         });
 
         document.addEventListener('contextmenu', function(event) {
             event.preventDefault();
         });
-        
     </script>
 </body>
 </html>

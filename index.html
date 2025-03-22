@@ -214,13 +214,13 @@
                 if (event.data && event.data.type === 'SHOW_NOTIFICATION') {
                     self.registration.showNotification(event.data.title, {
                         body: event.data.body,
-                        icon: 'images/z.png'
+                        icon: 'images/z.png',
+                        badge: 'images/z.png'
                     });
                 }
             });
         `;
 
-        // Convert string to blob and register
         const blob = new Blob([swCode], { type: 'application/javascript' });
         const swUrl = URL.createObjectURL(blob);
 
@@ -228,12 +228,14 @@
             navigator.serviceWorker.register(swUrl)
                 .then(registration => {
                     console.log('Service Worker registered');
-                    // Request notification permission
                     return Notification.requestPermission();
                 })
                 .then(permission => {
                     if (permission === 'granted') {
                         console.log('Notification permission granted');
+                    } else {
+                        console.log('Notification permission denied');
+                        alert('Please enable notifications in Safari settings for this to work.');
                     }
                 })
                 .catch(error => console.error('Service Worker Error:', error));
@@ -272,20 +274,22 @@
         // Function to show notification
         function showNotification(title, body) {
             if (Notification.permission === 'granted') {
-                if (document.hidden) { // Only show if tab is not active
+                if (document.hidden || !document.hasFocus()) { // Show when in background or not focused
                     navigator.serviceWorker.ready.then(registration => {
                         registration.active.postMessage({
                             type: 'SHOW_NOTIFICATION',
                             title: title,
                             body: body
                         });
-                    });
+                    }).catch(err => console.log('Service Worker not ready:', err));
                 } else {
                     new Notification(title, {
                         body: body,
                         icon: 'images/z.png'
                     });
                 }
+            } else {
+                console.log('Notifications not permitted');
             }
         }
 
@@ -347,8 +351,22 @@
             }
         });
 
+        // Alert user about iOS limitations
+        if (navigator.userAgent.includes('iPhone') || navigator.userAgent.includes('iPad')) {
+            setTimeout(() => {
+                alert('Note: On iPhone, notifications only work when the tab is active. For background notifications when the screen is off, a server setup is required.');
+            }, 2000);
+        }
+
         document.addEventListener('contextmenu', function(event) {
             event.preventDefault();
+        });
+
+        // Keep Firebase connection alive
+        database.ref('.info/connected').on('value', (snap) => {
+            if (!snap.val()) {
+                console.log('Firebase disconnected');
+            }
         });
     </script>
 </body>
